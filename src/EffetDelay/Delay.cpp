@@ -21,15 +21,44 @@ void DelayEffect::DelayChannel::Init(DelayLineOct<float, MAX_DELAY>* delayLine, 
     delayTarget = 2400.0f;
     feedback = 0.5f;
     active = true;
+    muteFade = 1.0f;
+    standbyTimer = 0;
+    lastTarget = 2400.0f;
+    del->SetDelay(currentDelay);
 }
 
 float DelayEffect::DelayChannel::Process(float in) {
-    // Lissage du temps de delay pour éviter les clics
-    fonepole(currentDelay, delayTarget, .0002f);
-    del->SetDelay(currentDelay);
+    // --- Mode Standby Amélioré (Anti-Scratching) ---
+    // Si le potard est en train d'être tourné (la cible change)
+    if (fabsf(delayTarget - lastTarget) > 0.1f) {
+        lastTarget = delayTarget;
+        standbyTimer = 10000; // Maintient le standby pendant ~200ms après le dernier mouvement (à 48kHz)
+    }
+
+    if (standbyTimer > 0) {
+        standbyTimer--;
+        
+        // Fade-out ultra-rapide
+        muteFade -= 0.01f;
+        if (muteFade <= 0.0f) {
+            muteFade = 0.0f;
+            // Dès qu'on est sous silence, le pointeur saute instantanément (aucun pitch-shift)
+            currentDelay = delayTarget;
+            del->SetDelay(currentDelay);
+        }
+    } else {
+        // Le potard ne bouge plus, on sort du standby (Fade-in)
+        muteFade += 0.01f;
+        if (muteFade > 1.0f) {
+            muteFade = 1.0f;
+        }
+    }
 
     // Lecture du son retardé
     float del_read = del->Read();
+
+    // Application du fade pour le mode standby
+    del_read *= muteFade;
 
     // Application du filtre passe-bas
     float read = tone.Process(del_read); 
@@ -107,6 +136,9 @@ void DelayEffect::DelayChannel::Init(float sampleRate, uint32_t max_delay_sample
     delayTarget = 2400.0f;
     feedback = 0.5f;
     active = true;
+    muteFade = 1.0f;
+    standbyTimer = 0;
+    lastTarget = 2400.0f;
 }
 
 void DelayEffect::DelayChannel::Free() {
@@ -123,8 +155,29 @@ void DelayEffect::DelayChannel::Free() {
 float DelayEffect::DelayChannel::Process(float in) {
     if (!buffer) return in;
 
-    // Lissage du temps de delay pour éviter les clics (équivalent local de fonepole)
-    currentDelay += 0.0002f * (delayTarget - currentDelay);
+    // Si le potard est en train d'être tourné (la cible change)
+    if (fabsf(delayTarget - lastTarget) > 0.1f) {
+        lastTarget = delayTarget;
+        standbyTimer = 10000; // Maintient le standby pendant ~220ms après le dernier mouvement
+    }
+
+    if (standbyTimer > 0) {
+        standbyTimer--;
+        
+        // Fade-out ultra-rapide
+        muteFade -= 0.01f;
+        if (muteFade <= 0.0f) {
+            muteFade = 0.0f;
+            // Dès qu'on est sous silence, le pointeur saute instantanément (aucun pitch-shift)
+            currentDelay = delayTarget;
+        }
+    } else {
+        // Le potard ne bouge plus, on sort du standby (Fade-in)
+        muteFade += 0.01f;
+        if (muteFade > 1.0f) {
+            muteFade = 1.0f;
+        }
+    }
 
     // Lecture du son retardé avec interpolation linéaire
     float read_idx_f = (float)write_idx - currentDelay;
@@ -137,6 +190,9 @@ float DelayEffect::DelayChannel::Process(float in) {
     float frac = read_idx_f - (float)r0;
 
     float del_read = buffer[r0] + (buffer[r1] - buffer[r0]) * frac;
+
+    // Application du fade pour le mode standby
+    del_read *= muteFade;
 
     // Application du filtre passe-bas
     float read = tone_a0 * del_read + tone_b1 * tone_z1;

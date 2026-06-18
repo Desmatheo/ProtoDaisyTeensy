@@ -662,6 +662,7 @@ void loop() {
 }
 
 void OnControlChange(byte channel, byte control, byte value) {
+    #pragma region Control MIDI
     float valNorm = value / 127.0f;
 
     // --- TRANCHE 1 : DELAY (CC 10 à 45) ---
@@ -778,5 +779,6 @@ void OnControlChange(byte channel, byte control, byte value) {
 
         }
     }
+    #pragma endregion
 }
 #endif

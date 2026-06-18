@@ -59,6 +59,9 @@ public:
         float tone_a0 = 1.0f;
         float tone_b1 = 0.0f;
 #endif
+        float muteFade = 1.0f;
+        uint32_t standbyTimer = 0;
+        float lastTarget = 0.0f;
         float currentDelay = 0.0f;
         float delayTarget = 0.0f;
         float feedback = 0.0f;
