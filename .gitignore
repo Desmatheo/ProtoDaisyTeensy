@@ -1,0 +1,26 @@
+# Dossiers de compilation
+build/
+DaisySP/
+gcem/
+infra/
+libDaisy/
+Q/
+*/build/
+src/test.cpp
+libs/
+
+# Fichiers objets et exécutables
+*.o
+*.a
+*.elf
+*.bin
+*.hex
+*.map
+
+# Paramètres de l'éditeur de code (ex: VS Code)
+.vscode/
+.idea/
+
+# Fichiers du système d'exploitation
+.DS_Store
+Thumbs.db

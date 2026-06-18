@@ -1,0 +1,25 @@
+[submodule "libDaisy"]
+	path = libDaisy
+	url = https://github.com/electro-smith/libDaisy.git
+	branch = master
+	submodule = true
+[submodule "DaisySP"]
+	path = DaisySP
+	url = https://github.com/electro-smith/DaisySP.git
+	branch = master
+	submodule = true
+[submodule "gcem"]
+	path = gcem
+	url = https://github.com/kthohr/gcem.git
+	branch = master
+	submodule = true
+[submodule "Q/q_lib"]
+	path = Q/q_lib
+	url = https://github.com/cycfi/q.git
+	branch = master
+	submodule = true
+[submodule "Q/infra"]
+	path = Q/infra
+	url = https://github.com/cycfi/infra.git
+	branch = master
+	submodule = true
