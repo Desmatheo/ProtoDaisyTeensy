@@ -1,43 +1,18 @@
 #include "include/main.h"
 
 #if USE_DAISY
-#if USE_DAISY_POD
-#include "daisy_pod.h"
-#else
-#include "daisy_seed.h"
-#endif
 
 #if SD_CARD_DS 
 #include "include/WavHexaPlayer.h"
 #endif
 
-#include "EffetEarth/Earth.h"
 #include <new> // Nécessaire pour le "placement new"
 #include <cstring> // Nécessaire pour memset
 
 
+#pragma region initiallisation  des variables
+
 using namespace daisy;
-
-StringUtil strings[] = {
-    StringUtil(EffectType::Bypass, 0),
-    StringUtil(EffectType::Bypass, 1),
-    StringUtil(EffectType::Bypass, 2),
-    StringUtil(EffectType::Bypass, 3),
-    StringUtil(EffectType::Bypass, 4),
-    StringUtil(EffectType::Bypass, 5)
-};
-
-#if USE_DAISY_POD
-DaisyPod hardware;
-
-bool volatile btnSwitchEffet = false;
-bool volatile btnSwitchparam = false;
-uint32_t last_blink;
-bool led_state;
-
-#else
-DaisySeed hardware;
-#endif
 
 #if CPU_METER
 CpuLoadMeter loadMeter;
@@ -50,154 +25,18 @@ FatFSInterface fsi;
 WavHexaPlayer  sampler;
 #endif
 
-paramUtil effectParams(3); // On indique qu'il y a 3 paramètres pour l'instant (PitchShifter)
+paramUtil effectParams(3); // On indique qu'il y a 3 paramètres pour l'instant
 
 // Allocation dans l'espace mémoire
 alignas(EarthEffect) static uint8_t                 earth_mem[6 * sizeof(EarthEffect)];
 alignas(DelayEffect) static uint8_t DSY_SDRAM_BSS   delay_mem[6 * sizeof(DelayEffect)];
 alignas(AudioEffectDrive) static uint8_t DSY_SDRAM_BSS drive_mem[6 * sizeof(AudioEffectDrive)];
 
+#pragma endregion
 
-
-void changeEffect(){
-    EffectType current = strings[idxString].type;
-    if(current == EffectType::Bypass) {
-        strings[idxString].type                     = EffectType::Mute;
-        strings[idxString].active_effect            = nullptr;
-    } else if (current == EffectType::Mute) {
-        strings[idxString].type                     = EffectType::Earth;
-        strings[idxString].active_effect            = earth_effects[idxString];
-    } else if(current == EffectType::Earth) {
-        strings[idxString].type                     = EffectType::Delay;
-        strings[idxString].active_effect            = delay_effects[idxString];
-    } else if(current == EffectType::Delay) {
-        strings[idxString].type                     = EffectType::Drive;
-        strings[idxString].active_effect            = drive_effects[idxString];
-    // } else if(current == EffectType::PitchShift) {
-    //     strings[idxString].type                  = EffectType::pitchShiftbkshep;
-    //     strings[idxString].active_effect_module  = pitchshiftbkshep_effects[idxString];
-    //     strings[idxString].active_effect         = nullptr;
-    // } else if(current == EffectType::pitchShiftbkshep) {
-    // //     strings[idxString].type               = EffectType::Uranus;
-    // //     strings[idxString].active_effect      = uranus_effects[idxString];
-    // // } else if(current == EffectType::Uranus) {
-    //     strings[idxString].type                  = EffectType::Neptune;
-    //     strings[idxString].active_effect         = neptune_effects[idxString];
-    //     strings[idxString].active_effect_module  = nullptr;
-    } else {
-        strings[idxString].type                     = EffectType::Bypass;
-        strings[idxString].active_effect            = nullptr;
-        //strings[idxString].active_effect_module   = nullptr;
-    }
-}
-
-void updateUI(){
-
-#if USE_DAISY_POD
-        hardware.ProcessAnalogControls();
-        hardware.ProcessDigitalControls();
-        
-        bool button_pressed = false;
-
-        // Si on tourne l'encodeur
-        int enc_inc = hardware.encoder.Increment(); 
-        if (enc_inc != 0) {
-            effectParams.changeParam(enc_inc);
-            effectParams.changing = false;
-            button_pressed = true; // Force la mise à jour des LEDs sans attendre
-        }
-
-        // Si on appuis sur l'encodeur
-        if (hardware.encoder.RisingEdge()) {
-            effectParams.changing = !effectParams.changing; // Toggle On/Off du mode édition
-            button_pressed = true; 
-        }
-
-        // Si on clique sur le bouton 1, on change d'effet
-        if(hardware.button1.RisingEdge()) {
-            changeEffect();
-            effectParams.changing = false; // Quitte le mode édition par sécurité
-            button_pressed = true;
-        }
-        
-        // Si on clique sur le bouton 2, on sélectionne la corde suivante
-        if(hardware.button2.RisingEdge()) {
-            idxString = (idxString + 1) % 6;
-            effectParams.changing = false; // Quitte le mode édition par sécurité
-            button_pressed = true;
-        }
-
-        // Timer non-bloquant : on fait clignoter la LED toutes les 500ms
-        if(System::GetNow() - last_blink > 500 || button_pressed) {
-            
-            if (button_pressed) {
-                led_state = true; // Allume tout de suite pour voir le changement
-            }
-            last_blink = System::GetNow();
-
-
-            // Affiche la couleur de l'effet assigné à la CORDE ACTUELLE
-            EffectType current = strings[idxString].type;
-            float r = 0.f, g = 0.f, b = 0.f;
-            
-            if (led_state) {
-                if (current == EffectType::Bypass) {
-                    r = 1.f;                        // Rouge
-                } else if (current == EffectType::Earth) {
-                    g = 1.f;                        // Vert classique
-                } else if (current == EffectType::Delay) {
-                    b = 1.f;                        // Bleu
-                } else if (current == EffectType::Drive) {
-                    r = 1.f; g = 1.f;               // Jaune (Rouge + Vert)
-                // } else if (current == EffectType::PitchShift) {
-                //     r = 1.f; g = 1.f; // Jaune
-                // } else if (current == EffectType::pitchShiftbkshep) {
-                //     r = 1.f; g = 1.f; b = 1.f;   // Blanc
-                // } else if (current == EffectType::Uranus) {
-                //     b = 1.f;                     // Bleu
-                // } else if (current == EffectType::Neptune) {
-                //     g = 1.f; b = 1.f;            // Cyan
-                // }
-                }
-            }
-
-            hardware.led1.Set(r, g, b); 
-
-
-            led_state = !led_state;
-        }
-
-        // --- Affiche la couleur du paramètre sélectionné sur la LED 2 ---
-        int current_param = effectParams.GetParam();
-        float r2 = 0.f, g2 = 0.f, b2 = 0.f;
-        
-        // Si on édite le paramètre, on fait clignoter la LED en synchro avec la LED 1
-        // led_state est inversé à la fin du timer, on regarde donc !led_state
-        bool led2_active = !effectParams.changing || !led_state;
-
-        if (led2_active) {
-            if (current_param == 0) {
-                r2 = 1.f; // Rouge pour le Paramètre 0
-            } else if (current_param == 1) {
-                b2 = 1.f; // Bleu pour le Paramètre 1
-            } else if (current_param == 2) {
-                g2 = 1.f; // Vert pour le Paramètre 2
-            }
-        }
-        hardware.led2.Set(r2, g2, b2);
-
-        hardware.UpdateLeds();
-#else
-        if(System::GetNow() - last_blink > 500) {
-            last_blink = System::GetNow();
-            hardware.SetLed(led_state);
-        
-            led_state = !led_state;
-        }
-#endif
-}
 
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size) {
+    #pragma region Boucle Audio
 #if CPU_METER
 #if !CPU_LoadEffect
     loadMeter.OnBlockStart();
@@ -244,20 +83,11 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
                     strings[j].active_effect->update(in_ptrs, out_ptrs, 0);
 
                     if (effectParams.changing && j == idxString && i == 0) { 
+#if USE_DAISY_POD
                         pot1_val = hardware.knob1.Process(); 
                         strings[j].active_effect->setParameter(effectParams.GetParam(), pot1_val);
+#endif
                     }
-
-                // Pour les effets bksheperd
-                // } else if (strings[j].active_effect_module != nullptr) {
-                //     strings[j].active_effect_module->ProcessStereo(in_arr[0][0], in_arr[1][0]);
-                //     out_arr[0][0] = strings[j].active_effect_module->GetAudioLeft();
-                //     out_arr[1][0] = strings[j].active_effect_module->GetAudioRight();
-                    
-                //     if (effectParams.changing && j == idxString && i == 0) { 
-                //         pot1_val = hardware.knob1.Process(); 
-                //         strings[j].active_effect_module->SetParameterAsMagnitude(effectParams.GetParam(), pot1_val);
-                //     }
                 }
             }
 
@@ -290,6 +120,8 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, s
     }
 #endif
 #endif
+
+    #pragma endregion
 }
 
 int main(void)
@@ -304,6 +136,11 @@ int main(void)
     // Allume la LED en Bleu pour indiquer le début de l'allocation mémoire
     hardware.led1.Set(0.f, 0.f, 1.f); // Bleu
     hardware.UpdateLeds();
+#elif USE_DAISY_TDM
+
+    hardware.Init(true);
+
+    hardware.seed.StartLog(false);
 #else
     // Configure et initialise la Daisy Seed seule
     hardware.Configure();
@@ -330,24 +167,25 @@ int main(void)
     }
 #endif
 
-    // Configuration audio commune
-    hardware.SetAudioBlockSize(48); // LIMITE LIBDAISY : la taille max est de 128. 48 est sûr et multiple de 6.
+#if !USE_DAISY_TDM
     samplerate = hardware.AudioSampleRate();
+    hardware.SetAudioBlockSize(48); // LIMITE LIBDAISY : la taille max est de 128. 48 est sûr et multiple de 6.
+#else 
+    samplerate = hardware.seed.AudioSampleRate();
+    hardware.seed.SetAudioBlockSize(48);
+#endif
 
+    auto blocksize = hardware.seed.AudioBlockSize();
 #if CPU_METER
     // Initialisation du module de mesure CPU
     hardware.seed.StartLog(true);
-    loadMeter.Init(hardware.AudioSampleRate(), hardware.AudioBlockSize());
+    loadMeter.Init(samplerate, blocksize);
 #endif
 
     // La SDRAM n'est pas mise à zéro par défaut. On la vide pour éviter des bruits stridents dans la reverb.
     memset(earth_mem, 0, 6 * sizeof(EarthEffect));
     memset(delay_mem, 0, 6 * sizeof(DelayEffect));
     memset(drive_mem, 0, 6 * sizeof(AudioEffectDrive));
-    // memset(uranus_mem, 0, 6 * sizeof(UranusEffect));
-    // memset(neptune_mem, 0, 6 * sizeof(NeptuneEffect));
-    // memset(pitchshift_mem, 0, 6 * sizeof(PitchShiftEffect));
-    // memset(pitchshiftbkshep_mem, 0, 6 * sizeof(bkshepherd::PitchShifterModule));
 
 
     // Instanciation des 6 blocs d'effets en SDRAM
@@ -355,10 +193,6 @@ int main(void)
         earth_effects[j] = new(&earth_mem[j * sizeof(EarthEffect)]) EarthEffect(samplerate);
         delay_effects[j] = new(&delay_mem[j * sizeof(DelayEffect)]) DelayEffect(samplerate);
         drive_effects[j] = new(&drive_mem[j * sizeof(AudioEffectDrive)]) AudioEffectDrive(samplerate);
-        // neptune_effects[j] = new(&neptune_mem[j * sizeof(NeptuneEffect)]) NeptuneEffect(hardware.seed, samplerate);
-        // pitchshift_effects[j] = new(&pitchshift_mem[j * sizeof(PitchShiftEffect)]) PitchShiftEffect(hardware.seed, samplerate);
-        // pitchshiftbkshep_effects[j] = new(&pitchshiftbkshep_mem[j * sizeof(bkshepherd::PitchShifterModule)]) bkshepherd::PitchShifterModule();
-        // pitchshiftbkshep_effects[j]->Init(samplerate);
     }
 
     // Allume la LED en Vert pour prouver que l'allocation a réussi et que la carte n'a pas planté
@@ -369,10 +203,15 @@ int main(void)
         hardware.led1.Set(0.f, 0.f, 0.f); // Éteint
         hardware.UpdateLeds();
 #else
-        hardware.SetLed(false);
+        hardware.seed.SetLed(false);
 #endif
 
+#if USE_DAISY_POD
     hardware.StartAdc();
+#else 
+    // hardware.StartAdc();
+#endif
+
     hardware.StartAudio(AudioCallback);
 
     led_state = true;
@@ -424,7 +263,8 @@ int main(void)
     }
 }
 
-#else 
+#else // Use Teensy
+
 #include <Arduino.h>
 #include <Audio.h>
 #include <Wire.h>
@@ -432,9 +272,7 @@ int main(void)
 #include "EffetDelay/Delay.h"
 #include "EffetDisto/AudioEffectDrive.h"
 #include "include/Utils.h"
-
-
-void OnControlChange(byte channel, byte control, byte value);
+#include "EffetTempBypass/Bypass.h"
 
 #pragma region Objet audios
 #if !InputTDM
@@ -444,6 +282,7 @@ AudioSynthWaveform       mesOscs[6];       // combinaison d'oscillateurs
 DelayEffect              mesDelays[6];
 EarthEffect              EffetEarth[6];
 AudioEffectDrive         mesDistos[6];
+BypassEffect             MesBypass[6];
 
 
 // Comme la reverb est stéréo, il faut 2 canaux de mixage
@@ -488,20 +327,27 @@ AudioConnection p_osc_dist3(mesOscs[3], 0, mesDistos[3], 0);
 AudioConnection p_osc_dist4(mesOscs[4], 0, mesDistos[4], 0);
 AudioConnection p_osc_dist5(mesOscs[5], 0, mesDistos[5], 0);
 #else
-AudioConnection p_tdm_dist0(inputTDM, 10, mesDistos[0], 0);
-AudioConnection p_tdm_dist1(inputTDM, 8,  mesDistos[1], 0);
-AudioConnection p_tdm_dist2(inputTDM, 6,  mesDistos[2], 0);
-AudioConnection p_tdm_dist3(inputTDM, 4,  mesDistos[3], 0);
-AudioConnection p_tdm_dist4(inputTDM, 2,  mesDistos[4], 0);
-AudioConnection p_tdm_dist5(inputTDM, 0,  mesDistos[5], 0);
+AudioConnection p_tdm_bypas1(inputTDM, 10, MesBypass[0], 0);
+AudioConnection p_tdm_bypas2(inputTDM, 8,  MesBypass[1], 0);
+AudioConnection p_tdm_bypas3(inputTDM, 6,  MesBypass[2], 0);
+AudioConnection p_tdm_bypas4(inputTDM, 4,  MesBypass[3], 0);
+AudioConnection p_tdm_bypas5(inputTDM, 2,  MesBypass[4], 0);
+AudioConnection p_tdm_bypas6(inputTDM, 0,  MesBypass[5], 0);
 #endif
 
-AudioConnection p_dist_earth0(mesDistos[0], 0, EffetEarth[0], 0);
-AudioConnection p_dist_earth1(mesDistos[1], 0, EffetEarth[1], 0);
-AudioConnection p_dist_earth2(mesDistos[2], 0, EffetEarth[2], 0);
-AudioConnection p_dist_earth3(mesDistos[3], 0, EffetEarth[3], 0);
-AudioConnection p_dist_earth4(mesDistos[4], 0, EffetEarth[4], 0);
-AudioConnection p_dist_earth5(mesDistos[5], 0, EffetEarth[5], 0);
+AudioConnection p_tdm_dist0(MesBypass[0], 0, mesDistos[0], 0);
+AudioConnection p_tdm_dist1(MesBypass[1], 0,  mesDistos[1], 0);
+AudioConnection p_tdm_dist2(MesBypass[2], 0,  mesDistos[2], 0);
+AudioConnection p_tdm_dist3(MesBypass[3], 0,  mesDistos[3], 0);
+AudioConnection p_tdm_dist4(MesBypass[4], 0,  mesDistos[4], 0);
+AudioConnection p_tdm_dist5(MesBypass[5], 0,  mesDistos[5], 0);
+
+AudioConnection p_tdm_oct0(mesDistos[0], 0, EffetEarth[0], 0);
+AudioConnection p_tdm_oct1(mesDistos[1], 0,  EffetEarth[1], 0);
+AudioConnection p_tdm_oct2(mesDistos[2], 0,  EffetEarth[2], 0);
+AudioConnection p_tdm_oct3(mesDistos[3], 0,  EffetEarth[3], 0);
+AudioConnection p_tdm_oct4(mesDistos[4], 0,  EffetEarth[4], 0);
+AudioConnection p_tdm_oct5(mesDistos[5], 0,  EffetEarth[5], 0);
 
 AudioConnection p_earth_dly0(EffetEarth[0], 0, mesDelays[0], 0);
 AudioConnection p_earth_dly1(EffetEarth[1], 0, mesDelays[1], 0);
@@ -554,6 +400,8 @@ bool Bypass = false;
 int effetActif[6] = {0, 0, 0, 0, 0, 0}; // 0 = Aucun, 1 = Delay, 2 = Disto, 3 = Earth
 bool stringBypass[6] = {false, false, false, false, false, false};
 bool globalBypassState = false;
+
+void OnControlChange(byte channel, byte control, byte value);
 
 const int reset_p = 2; 
 
@@ -638,7 +486,7 @@ void loop() {
 #if !InputTDM
     if (tempsActuel - tempsDerniereNote >= 400) { // on joue une corde toutes les 400 ms
         tempsDerniereNote = tempsActuel;  
-        if (!cordeMute[cordeCourante]) {         // On ne joue la corde QUE si elle n'est pas muette
+        if (!stringBypass[cordeCourante]) {      // On ne joue la corde QUE si elle n'est pas muette
             volumesCordes[cordeCourante] = 0.3f; 
             mesOscs[cordeCourante].frequency(frequencesGuitare[cordeCourante]);
         }

@@ -12,7 +12,8 @@
 #endif
 #define OutputUSB 1   // 1: Sortie Casque/PC (USB), 0: Désactivé
 
-#define USE_DAISY_POD 1
+#define USE_DAISY_POD 0
+#define USE_DAISY_TDM 1
 #define CPU_METER 1
 #define SD_CARD_DS 0
 #define Padding_on 0
