@@ -15,7 +15,7 @@ public:
 
 
     virtual ~Effect() = default;
-    virtual void update(const float** in, float** out, int idx) = 0;
-    virtual float updateTest(const float in, float out, int idx) = 0;
+    virtual void update(const float** in, float** out, int idx, int ch) = 0;
+    virtual float updateTest(const float in, float out, int idx, int ch) = 0;
     virtual void setParameter(int param_id, float value) = 0;
 };

@@ -88,8 +88,8 @@ public:
 #endif
 
 #if USE_DAISY
-    void update(const float** in, float** out, int idx) override;
-    float updateTest(const float in, float out, int idx) override;
+    void update(const float** in, float** out, int idx, int ch) override;
+    float updateTest(const float in, float out, int idx, int ch ) override;
 #else 
     virtual void update() override;
 

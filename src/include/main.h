@@ -71,6 +71,8 @@ StringUtil strings[] = {
     StringUtil(EffectType::Bypass, 5)
 };
 
+#include "audio_processing.h"
+
 int volatile idxString = 0;
 
 class paramUtil{

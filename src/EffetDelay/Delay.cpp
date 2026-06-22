@@ -84,21 +84,21 @@ DelayEffect::DelayEffect(float sampleRate) {
     setFeedback(0.7f);
 }
 
-void DelayEffect::update(const float** in, float** out, int idx) {
+void DelayEffect::update(const float** in, float** out, int idx, int ch) {
     float inputL = in[0][idx];
     float inputR = in[1][idx];
 
 
     // Traitement du son par les lignes de delay
     float delay_outL = delayL.Process(inputL);
-    float delay_outR = delayR.Process(inputR);
+    // float delay_outR = delayR.Process(inputR);
 
     // Mixage du son original (dry) et du son traité (wet)
     out[0][idx] = inputL * dryMix + delay_outL * wetMix * volume;
-    out[1][idx] = inputR * dryMix + delay_outR * wetMix * volume;
+    //out[1][idx] = inputR * dryMix + delay_outR * wetMix * volume;
 }
 
-float DelayEffect::updateTest(const float in, float out, int idx) {
+float DelayEffect::updateTest(const float in, float out, int idx, int ch) {
     return in; // Implémentation factice pour satisfaire le compilateur
 }
 

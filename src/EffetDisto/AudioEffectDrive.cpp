@@ -30,7 +30,7 @@ AudioEffectDrive::~AudioEffectDrive()
 {
 }
 
-void AudioEffectDrive::update(const float** in, float** out, int idx)
+void AudioEffectDrive::update(const float** in, float** out, int idx, int ch)
 {
     float input = in[0][idx];
 

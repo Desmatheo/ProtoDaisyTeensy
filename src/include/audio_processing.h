@@ -5,7 +5,7 @@
 #include "daisy_core.h"
 #include "daisy_tdm_slave.h"
 
-extern DaisyTdmSlave hw;
+extern DaisyTdmSlave hardware;
 
 // ================================================================
 // Diagnostics shared between the audio callback (IRQ context) and the
@@ -40,10 +40,37 @@ static AudioDiagnostics audio_diag;
 //   out[2] = in[2] (Canal Droit)
 //   Les autres sorties sont mises au silence.
 // ================================================================
-static void AudioCallback(daisy::AudioHandle::InputBuffer  in,
+
+#define HexaTDM 1
+
+static void AudiotestCallback(daisy::AudioHandle::InputBuffer  in,
                           daisy::AudioHandle::OutputBuffer out,
                           size_t                           size)
 {
+    const float** in2 = const_cast<const float**>(in);
+    float** out2 = const_cast<float**>(out);
+    //parcourt les echantillons du buffer
+    for (int i = 0; i < (int)size; i++){
+
+
+        // Audio de sortie (6 entrées)
+        for (int j = 0; j < 6; j++){
+            // Si la corde est mute on met a 0 sans chercher le sample d'entrée
+            if (strings[j].type == EffectType::Mute) {
+                out[j][i] = 0;
+            }
+            else {
+
+                if (strings[j].type == EffectType::Bypass) {
+                    out[j][i] = in[j][i];
+                } else if (strings[j].active_effect != nullptr) {
+                    strings[j].active_effect->update(in2, out2, i, j);
+                }
+            }
+        }
+    };
+
+    /*
     audio_diag.callback_count++;
 
     bool signal_present = false;
@@ -75,7 +102,7 @@ static void AudioCallback(daisy::AudioHandle::InputBuffer  in,
     }
 
     // On-board LED lights up while audio is arriving from the Teensy.
-    hw.seed.SetLed(signal_present);
+    hw.seed.SetLed(signal_present); */
 }
 
 #endif // AUDIO_PROCESSING_H

@@ -34,95 +34,96 @@ alignas(AudioEffectDrive) static uint8_t DSY_SDRAM_BSS drive_mem[6 * sizeof(Audi
 
 #pragma endregion
 
+/*
+// void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size) {
+//     #pragma region Boucle Audio
+// #if CPU_METER
+// #if !CPU_LoadEffect
+//     loadMeter.OnBlockStart();
+// #elif CPU_LoadAll
+//     loadMeter.OnBlockStart();
+// #endif
+// #endif
 
-void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size) {
-    #pragma region Boucle Audio
-#if CPU_METER
-#if !CPU_LoadEffect
-    loadMeter.OnBlockStart();
-#elif CPU_LoadAll
-    loadMeter.OnBlockStart();
-#endif
-#endif
+//     float pot1_val = 0.0f;
 
-    float pot1_val = 0.0f;
+//     //parcourt les echantillons du buffer
+//     for (int i = 0; i < (int)size; i++){
+//         // Audio de sortie (cumulé des 6 entrées)
+//         float mixed_out_l = 0.0f;
+//         float mixed_out_r = 0.0f;
 
-    //parcourt les echantillons du buffer
-    for (int i = 0; i < (int)size; i++){
-        // Audio de sortie (cumulé des 6 entrées)
-        float mixed_out_l = 0.0f;
-        float mixed_out_r = 0.0f;
+//         for (int j = 0; j < 6; j++){
+//             float out_arr[2][1] = {{0.0f}, {0.0f}};
+//             float* out_ptrs[2] = {out_arr[0], out_arr[1]};
 
-        for (int j = 0; j < 6; j++){
-            float out_arr[2][1] = {{0.0f}, {0.0f}};
-            float* out_ptrs[2] = {out_arr[0], out_arr[1]};
+//             // Si la corde est mute on met a 0 sans chercher le sample d'entrée
+//             if (strings[j].type == EffectType::Mute) {
+//                 out_arr[0][0] = 0;
+//                 out_arr[1][0] = 0;
+//             }
+//             else {
 
-            // Si la corde est mute on met a 0 sans chercher le sample d'entrée
-            if (strings[j].type == EffectType::Mute) {
-                out_arr[0][0] = 0;
-                out_arr[1][0] = 0;
-            }
-            else {
-
-#if SD_CARD_DS
-                float sample = s162f(sampler.StreamHex(j));
-                float in_arr[2][1] = {{sample}, {sample}};
-#else 
-                float in_arr[2][1] = {{in[0][i]}, {in[1][i]}};    
-#endif
-                const float* in_ptrs[2] = {in_arr[0], in_arr[1]};
+// #if SD_CARD_DS
+//                 float sample = s162f(sampler.StreamHex(j));
+//                 float in_arr[2][1] = {{sample}, {sample}};
+// #else 
+//                 float in_arr[2][1] = {{in[0][i]}, {in[1][i]}};    
+// #endif
+//                 const float* in_ptrs[2] = {in_arr[0], in_arr[1]};
 
 
-                if (strings[j].type == EffectType::Bypass) {
-                    out_arr[0][0] = in_arr[0][0];
-                    out_arr[1][0] = in_arr[1][0];
-                } else if (strings[j].type == EffectType::Mute) {
-                    out_arr[0][0] = 0;
-                    out_arr[1][0] = 0;
-                } else if (strings[j].active_effect != nullptr) {
-                    strings[j].active_effect->update(in_ptrs, out_ptrs, 0);
+//                 if (strings[j].type == EffectType::Bypass) {
+//                     out_arr[0][0] = in_arr[0][0];
+//                     out_arr[1][0] = in_arr[1][0];
+//                 } else if (strings[j].type == EffectType::Mute) {
+//                     out_arr[0][0] = 0;
+//                     out_arr[1][0] = 0;
+//                 } else if (strings[j].active_effect != nullptr) {
+//                     strings[j].active_effect->update(in_ptrs, out_ptrs, 0);
 
-                    if (effectParams.changing && j == idxString && i == 0) { 
-#if USE_DAISY_POD
-                        pot1_val = hardware.knob1.Process(); 
-                        strings[j].active_effect->setParameter(effectParams.GetParam(), pot1_val);
-#endif
-                    }
-                }
-            }
+//                     if (effectParams.changing && j == idxString && i == 0) { 
+// #if USE_DAISY_POD
+//                         pot1_val = hardware.knob1.Process(); 
+//                         strings[j].active_effect->setParameter(effectParams.GetParam(), pot1_val);
+// #endif
+//                     }
+//                 }
+//             }
 
-#if Padding_on
-            mixed_out_l += out_arr[0][0] * ((j + 1) / 6.0f);
-            mixed_out_r += out_arr[1][0] * (1 - ((j + 1) / 6.0f));
-#else 
-            mixed_out_l += out_arr[0][0];
-            mixed_out_r += out_arr[1][0];
-#endif
-        }
-        out[0][i] = mixed_out_l ;// / 6.0f;
-        out[1][i] = mixed_out_r ;// / 6.0f;
-    };
-#if CPU_METER
-#if !CPU_LoadEffect
-    loadMeter.OnBlockEnd();
-#elif CPU_LoadAll
-    // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
-    if (earth_effects[0] != nullptr) {
-        earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
-        earth_effects[0]->profiled_ticks = 0;
-    }
-    loadMeter.OnBlockEnd();
-#else 
-    // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
-    if (earth_effects[0] != nullptr) {
-        earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
-        earth_effects[0]->profiled_ticks = 0;
-    }
-#endif
-#endif
+// #if Padding_on
+//             mixed_out_l += out_arr[0][0] * ((j + 1) / 6.0f);
+//             mixed_out_r += out_arr[1][0] * (1 - ((j + 1) / 6.0f));
+// #else 
+//             mixed_out_l += out_arr[0][0];
+//             mixed_out_r += out_arr[1][0];
+// #endif
+//         }
+//         out[0][i] = mixed_out_l ;// / 6.0f;
+//         out[1][i] = mixed_out_r ;// / 6.0f;
+//     };
+// #if CPU_METER
+// #if !CPU_LoadEffect
+//     loadMeter.OnBlockEnd();
+// #elif CPU_LoadAll
+//     // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
+//     if (earth_effects[0] != nullptr) {
+//         earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
+//         earth_effects[0]->profiled_ticks = 0;
+//     }
+//     loadMeter.OnBlockEnd();
+// #else 
+//     // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
+//     if (earth_effects[0] != nullptr) {
+//         earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
+//         earth_effects[0]->profiled_ticks = 0;
+//     }
+// #endif
+// #endif
 
-    #pragma endregion
-}
+//     #pragma endregion
+// }
+*/
 
 int main(void)
 {
@@ -212,7 +213,7 @@ int main(void)
     // hardware.StartAdc();
 #endif
 
-    hardware.StartAudio(AudioCallback);
+    hardware.StartAudio(AudiotestCallback);
 
     led_state = true;
     last_blink = System::GetNow();
@@ -335,14 +336,14 @@ AudioConnection p_tdm_bypas5(inputTDM, 2,  MesBypass[4], 0);
 AudioConnection p_tdm_bypas6(inputTDM, 0,  MesBypass[5], 0);
 #endif
 
-AudioConnection p_tdm_dist0(MesBypass[0], 0, mesDistos[0], 0);
+AudioConnection p_tdm_dist0(MesBypass[0], 0,  mesDistos[0], 0);
 AudioConnection p_tdm_dist1(MesBypass[1], 0,  mesDistos[1], 0);
 AudioConnection p_tdm_dist2(MesBypass[2], 0,  mesDistos[2], 0);
 AudioConnection p_tdm_dist3(MesBypass[3], 0,  mesDistos[3], 0);
 AudioConnection p_tdm_dist4(MesBypass[4], 0,  mesDistos[4], 0);
 AudioConnection p_tdm_dist5(MesBypass[5], 0,  mesDistos[5], 0);
 
-AudioConnection p_tdm_oct0(mesDistos[0], 0, EffetEarth[0], 0);
+AudioConnection p_tdm_oct0(mesDistos[0], 0,  EffetEarth[0], 0);
 AudioConnection p_tdm_oct1(mesDistos[1], 0,  EffetEarth[1], 0);
 AudioConnection p_tdm_oct2(mesDistos[2], 0,  EffetEarth[2], 0);
 AudioConnection p_tdm_oct3(mesDistos[3], 0,  EffetEarth[3], 0);
@@ -594,6 +595,22 @@ void OnControlChange(byte channel, byte control, byte value) {
 
     // --- TRANCHE 4 : BYPASS DES CORDES INDIVIDUELLES (CC 0 à 5) ---
     else if (control >= 0 && control <= 5) {
+
+
+        int ccRelatif = control - 90;
+        int corde = ccRelatif / 6;
+        int potard = ccRelatif % 6;
+        
+        // Affichage mouchard dans la console VS Code
+        Serial.print("MIDI -> Effet: DELAY | Corde: ");
+        Serial.print(corde);
+        Serial.print(" | Potard: P");
+        Serial.print(potard + 1);
+        Serial.print(" | Valeur: ");
+        Serial.print(value);
+        Serial.print(" | Valeur Normalisé: ");
+        Serial.println(valNorm);
+
             // La valeur > 63 suppose que 127 = Bypass ON (son coupé) et 0 = Bypass OFF.
         // (Si ton bouton envoie l'inverse pour "Allumer l'effet", remplace par "value < 64")
         bool isBypassed = (value > 63); 
@@ -613,7 +630,9 @@ void OnControlChange(byte channel, byte control, byte value) {
     
     // --- TRANCHE 5 : BYPASS GLOBAL (CC 126) ---
     else if (control == 126) {
+
         globalBypassState = (value > 63);
+        
         for (int i = 0; i < 6; i++) {
             if (globalBypassState || stringBypass[i]) {
                 mesDistos[i].setEnabled(false);

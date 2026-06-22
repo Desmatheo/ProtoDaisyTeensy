@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef USE_DAISY
-#define USE_DAISY 0
+#define USE_DAISY 1
 #endif
 
 #define MODE_HEXAPHONIQUE

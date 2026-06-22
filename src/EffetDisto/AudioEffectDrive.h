@@ -70,8 +70,8 @@ public:
 
     // 1 entrée, 1 sortie
 #if USE_DAISY
-    void update(const float** in, float** out, int idx) override;
-    float updateTest(const float in, float out, int idx) override { return in; }
+    void update(const float** in, float** out, int idx, int ch) override;
+    float updateTest(const float in, float out, int idx, int ch) override { return in; }
 #else
     virtual void update() override;
 

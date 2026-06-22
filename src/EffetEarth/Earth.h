@@ -61,8 +61,8 @@ class EarthEffect : public AudioStream {
 
 
 #if USE_DAISY
-    void update(const float** in, float** out, int idx) override;
-    float updateTest(const float in, float out, int idx) override;
+    void update(const float** in, float** out, int idx, int ch) override;
+    float updateTest(const float in, float out, int idx, int ch) override;
 #endif
 
     void setMix(float mix);                // Ctrl 2 (0.0 -> 1.0)

@@ -46,11 +46,11 @@ EarthEffect::EarthEffect()
 }
 
 #if USE_DAISY
-void EarthEffect::update(const float** in, float** out, int idx) {
+void EarthEffect::update(const float** in, float** out, int idx, int ch) {
     float inputL;
     float inputR;
 
-    inputL = inputR = in[0][idx] + 1e-9f; // Anti-denormal
+    inputL = inputR = in[ch][idx] + 1e-9f; // Anti-denormal
 
     buff[bin_counter] = inputL;
     
@@ -106,11 +106,10 @@ void EarthEffect::update(const float** in, float** out, int idx) {
 #endif
 
     // Mixage final dry/wet pour cet effet de corde
-    out[0][idx] = inputL * dryMix + effect_output * wetMix * volume;
-    out[1][idx] = out[0][idx];
+    out[ch][idx] = (inputL * dryMix + effect_output * wetMix) * volume;
 }
 
-float EarthEffect::updateTest(const float in, float out, int idx) {
+float EarthEffect::updateTest(const float in, float out, int idx, int ch) {
     return in; // Implémentation factice pour satisfaire le compilateur
 }
 #else
