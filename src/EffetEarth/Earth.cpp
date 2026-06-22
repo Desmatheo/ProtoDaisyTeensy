@@ -167,7 +167,7 @@ void EarthEffect::update() {
 
         float octave_signal = buff_out[bin_counter];
 
-        float output = (inputL * dryMix) + (octave_signal * wetMix * volume);
+        float output = ((inputL * dryMix) + (octave_signal * wetMix)) * volume;
 
         if (output > 1.0f) output = 1.0f;
         if (output < -1.0f) output = -1.0f;
