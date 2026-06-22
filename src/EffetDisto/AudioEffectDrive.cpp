@@ -307,7 +307,7 @@ void AudioEffectDrive::update()
         float wet = yLP * volume_;
 
         // Mix dry/wet
-        float y = one_minus_mix * dry + mix * wet;
+        float y = (one_minus_mix * dry + mix * wet);
 
         // clamp & convert
         if (y > 1.0f)  y = 1.0f;

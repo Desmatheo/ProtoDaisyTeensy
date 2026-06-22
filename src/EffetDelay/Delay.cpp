@@ -267,8 +267,8 @@ void DelayEffect::update() {
         float delay_outL = delayL.Process(inputL);
         float delay_outR = delayR.Process(inputR);
 
-        float outputL = (inputL * dryMix) + (delay_outL * wetMix * volume);
-        float outputR = (inputR * dryMix) + (delay_outR * wetMix * volume);
+        float outputL = ((inputL * dryMix) + (delay_outL * wetMix)) * volume;
+        float outputR = ((inputR * dryMix) + (delay_outR * wetMix)) * volume;
 
         // Saturation douce (clamp final)
         if (outputL > 1.0f) outputL = 1.0f;
