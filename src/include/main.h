@@ -63,7 +63,7 @@ public :
 };
 
 StringUtil strings[] = {
-    StringUtil(EffectType::Bypass, 0),
+    StringUtil(EffectType::Earth, 0),
     StringUtil(EffectType::Bypass, 1),
     StringUtil(EffectType::Bypass, 2),
     StringUtil(EffectType::Bypass, 3),
@@ -71,9 +71,21 @@ StringUtil strings[] = {
     StringUtil(EffectType::Bypass, 5)
 };
 
-#include "audio_processing.h"
+#if CPU_METER
+CpuLoadMeter loadMeter;
+#endif
+
+#if SD_CARD_DS
+SdmmcHandler   sdcard;
+FatFSInterface fsi;
+WavHexaPlayer  sampler;
+#endif
+
 
 int volatile idxString = 0;
+
+
+
 
 class paramUtil{
 public : 
@@ -106,7 +118,7 @@ public :
     }
 };
 
-extern paramUtil effectParams;
+paramUtil effectParams(3);
 
 void changeEffect(){
     #pragma region Changement des effets
@@ -249,7 +261,6 @@ void updateUI(){
 #endif
 }
 
-
-
+#include "audio_processing.h"
 
 #endif // USE_DAISY

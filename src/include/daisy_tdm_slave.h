@@ -68,7 +68,7 @@ class DaisyTdmSlave
         cfg.periph = SaiHandle::Config::Peripheral::SAI_2;
         // Nominal only: in slave mode every clock comes from the master.
         cfg.sr        = SaiHandle::Config::SampleRate::SAI_44_1KHZ;
-        cfg.bit_depth = SaiHandle::Config::BitDepth::SAI_24BIT; // Plus stable dans libDaisy, évite les erreurs de conversion float
+        cfg.bit_depth = SaiHandle::Config::BitDepth::SAI_32BIT; // OBLIGATOIRE en TDM pour lire les 32 bits correctement
         cfg.tdm_slots = kTdmSlots;
 
         // Both blocks are slaves of the Teensy. The external FS/SCK pins of

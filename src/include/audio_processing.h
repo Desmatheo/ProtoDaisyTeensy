@@ -5,7 +5,13 @@
 #include "daisy_core.h"
 #include "daisy_tdm_slave.h"
 
+#if USE_DAISY_TDM
 extern DaisyTdmSlave hardware;
+#elif USE_DAISY_POD
+extern DaisyPod hardware;
+#else
+extern DaisySeed hardware;
+#endif
 
 // ================================================================
 // Diagnostics shared between the audio callback (IRQ context) and the
@@ -43,10 +49,28 @@ static AudioDiagnostics audio_diag;
 
 #define HexaTDM 1
 
-static void AudiotestCallback(daisy::AudioHandle::InputBuffer  in,
+
+#if USE_DAISY_TDM
+static void AudioCallback(daisy::AudioHandle::InputBuffer  in,
                           daisy::AudioHandle::OutputBuffer out,
                           size_t                           size)
 {
+
+
+    hardware.seed.PrintLine("test entrée AudioBlock");
+
+
+    #if CPU_METER
+    #if !CPU_LoadEffect
+        loadMeter.OnBlockStart();
+    #elif CPU_LoadAll
+        loadMeter.OnBlockStart();
+    #endif
+    #endif
+
+
+
+
     const float** in2 = const_cast<const float**>(in);
     float** out2 = const_cast<float**>(out);
     //parcourt les echantillons du buffer
@@ -70,6 +94,25 @@ static void AudiotestCallback(daisy::AudioHandle::InputBuffer  in,
         }
     };
 
+
+    #if CPU_METER
+    #if !CPU_LoadEffect
+        loadMeter.OnBlockEnd();
+    #elif CPU_LoadAll
+        // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
+        if (earth_effects[0] != nullptr) {
+            earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
+            earth_effects[0]->profiled_ticks = 0;
+        }
+        loadMeter.OnBlockEnd();
+    #else 
+        // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
+        if (earth_effects[0] != nullptr) {
+            earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
+            earth_effects[0]->profiled_ticks = 0;
+        }
+    #endif
+    #endif
     /*
     audio_diag.callback_count++;
 
@@ -104,5 +147,100 @@ static void AudiotestCallback(daisy::AudioHandle::InputBuffer  in,
     // On-board LED lights up while audio is arriving from the Teensy.
     hw.seed.SetLed(signal_present); */
 }
+
+
+
+#else
+void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size) {
+    #pragma region Boucle Audio
+#if CPU_METER
+#if !CPU_LoadEffect
+    loadMeter.OnBlockStart();
+#elif CPU_LoadAll
+    loadMeter.OnBlockStart();
+#endif
+#endif
+
+    // hardware.seed.PrintLine("test entrée boucle");
+
+    float pot1_val = 0.0f;
+
+    //parcourt les echantillons du buffer
+    for (int i = 0; i < (int)size; i++){
+        // Audio de sortie (cumulé des 6 entrées)
+        float mixed_out_l = 0.0f;
+        float mixed_out_r = 0.0f;
+
+        for (int j = 0; j < 6; j++){
+            float out_arr[2][1] = {{0.0f}, {0.0f}};
+            float* out_ptrs[2] = {out_arr[0], out_arr[1]};
+
+            // Si la corde est mute on met a 0 sans chercher le sample d'entrée
+            if (strings[j].type == EffectType::Mute) {
+                out_arr[0][0] = 0;
+                out_arr[1][0] = 0;
+            }
+            else {
+
+#if SD_CARD_DS
+                float sample = s162f(sampler.StreamHex(j));
+                float in_arr[2][1] = {{sample}, {sample}};
+#else 
+                float in_arr[2][1] = {{in[0][i]}, {in[1][i]}};    
+#endif
+                const float* in_ptrs[2] = {in_arr[0], in_arr[1]};
+
+
+                if (strings[j].type == EffectType::Bypass) {
+                    out_arr[0][0] = in_arr[0][0];
+                    out_arr[1][0] = in_arr[1][0];
+                } else if (strings[j].type == EffectType::Mute) {
+                    out_arr[0][0] = 0;
+                    out_arr[1][0] = 0;
+                } else if (strings[j].active_effect != nullptr) {
+                    strings[j].active_effect->update(in_ptrs, out_ptrs, 0, 0);
+
+                    if (effectParams.changing && j == idxString && i == 0) { 
+#if USE_DAISY_POD
+                        pot1_val = hardware.knob1.Process(); 
+                        strings[j].active_effect->setParameter(effectParams.GetParam(), pot1_val);
+#endif
+                    }
+                }
+            }
+
+#if Padding_on
+            mixed_out_l += out_arr[0][0] * ((j + 1) / 6.0f);
+            mixed_out_r += out_arr[1][0] * (1 - ((j + 1) / 6.0f));
+#else 
+            mixed_out_l += out_arr[0][0];
+            mixed_out_r += out_arr[1][0];
+#endif
+        }
+        out[0][i] = mixed_out_l ;// / 6.0f;
+        out[1][i] = mixed_out_r ;// / 6.0f;
+    };
+#if CPU_METER
+#if !CPU_LoadEffect
+    loadMeter.OnBlockEnd();
+#elif CPU_LoadAll
+    // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
+    if (earth_effects[0] != nullptr) {
+        earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
+        earth_effects[0]->profiled_ticks = 0;
+    }
+    loadMeter.OnBlockEnd();
+#else 
+    // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
+    if (earth_effects[0] != nullptr) {
+        earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
+        earth_effects[0]->profiled_ticks = 0;
+    }
+#endif
+#endif
+
+    #pragma endregion
+}
+#endif
 
 #endif // AUDIO_PROCESSING_H

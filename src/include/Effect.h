@@ -2,8 +2,6 @@
 
 #include "daisy_seed.h"
 
-#define CPU_LoadEffect 1
-#define CPU_LoadAll 1
 
 class Effect {
 public:

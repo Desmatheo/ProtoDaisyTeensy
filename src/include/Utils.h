@@ -13,11 +13,18 @@
 #define OutputUSB 1   // 1: Sortie Casque/PC (USB), 0: Désactivé
 
 #define USE_DAISY_POD 0
+
+#if !USE_DAISY_POD  //eviter les conflits
 #define USE_DAISY_TDM 1
-#define CPU_METER 1
+#endif
+
 #define SD_CARD_DS 0
 #define Padding_on 0
 
+
+#define CPU_METER 1
+#define CPU_LoadEffect 0
+#define CPU_LoadAll 1
 
 
 static inline float clampf(float v, float lo, float hi) {

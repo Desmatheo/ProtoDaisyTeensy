@@ -14,116 +14,13 @@
 
 using namespace daisy;
 
-#if CPU_METER
-CpuLoadMeter loadMeter;
-#endif
-
-
-#if SD_CARD_DS
-SdmmcHandler   sdcard;
-FatFSInterface fsi;
-WavHexaPlayer  sampler;
-#endif
-
-paramUtil effectParams(3); // On indique qu'il y a 3 paramètres pour l'instant
 
 // Allocation dans l'espace mémoire
-alignas(EarthEffect) static uint8_t                 earth_mem[6 * sizeof(EarthEffect)];
-alignas(DelayEffect) static uint8_t DSY_SDRAM_BSS   delay_mem[6 * sizeof(DelayEffect)];
-alignas(AudioEffectDrive) static uint8_t DSY_SDRAM_BSS drive_mem[6 * sizeof(AudioEffectDrive)];
+alignas(EarthEffect) static uint8_t DSY_SDRAM_BSS       earth_mem[6 * sizeof(EarthEffect)];
+alignas(DelayEffect) static uint8_t DSY_SDRAM_BSS       delay_mem[6 * sizeof(DelayEffect)];
+alignas(AudioEffectDrive) static uint8_t DSY_SDRAM_BSS  drive_mem[6 * sizeof(AudioEffectDrive)];
 
 #pragma endregion
-
-/*
-// void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size) {
-//     #pragma region Boucle Audio
-// #if CPU_METER
-// #if !CPU_LoadEffect
-//     loadMeter.OnBlockStart();
-// #elif CPU_LoadAll
-//     loadMeter.OnBlockStart();
-// #endif
-// #endif
-
-//     float pot1_val = 0.0f;
-
-//     //parcourt les echantillons du buffer
-//     for (int i = 0; i < (int)size; i++){
-//         // Audio de sortie (cumulé des 6 entrées)
-//         float mixed_out_l = 0.0f;
-//         float mixed_out_r = 0.0f;
-
-//         for (int j = 0; j < 6; j++){
-//             float out_arr[2][1] = {{0.0f}, {0.0f}};
-//             float* out_ptrs[2] = {out_arr[0], out_arr[1]};
-
-//             // Si la corde est mute on met a 0 sans chercher le sample d'entrée
-//             if (strings[j].type == EffectType::Mute) {
-//                 out_arr[0][0] = 0;
-//                 out_arr[1][0] = 0;
-//             }
-//             else {
-
-// #if SD_CARD_DS
-//                 float sample = s162f(sampler.StreamHex(j));
-//                 float in_arr[2][1] = {{sample}, {sample}};
-// #else 
-//                 float in_arr[2][1] = {{in[0][i]}, {in[1][i]}};    
-// #endif
-//                 const float* in_ptrs[2] = {in_arr[0], in_arr[1]};
-
-
-//                 if (strings[j].type == EffectType::Bypass) {
-//                     out_arr[0][0] = in_arr[0][0];
-//                     out_arr[1][0] = in_arr[1][0];
-//                 } else if (strings[j].type == EffectType::Mute) {
-//                     out_arr[0][0] = 0;
-//                     out_arr[1][0] = 0;
-//                 } else if (strings[j].active_effect != nullptr) {
-//                     strings[j].active_effect->update(in_ptrs, out_ptrs, 0);
-
-//                     if (effectParams.changing && j == idxString && i == 0) { 
-// #if USE_DAISY_POD
-//                         pot1_val = hardware.knob1.Process(); 
-//                         strings[j].active_effect->setParameter(effectParams.GetParam(), pot1_val);
-// #endif
-//                     }
-//                 }
-//             }
-
-// #if Padding_on
-//             mixed_out_l += out_arr[0][0] * ((j + 1) / 6.0f);
-//             mixed_out_r += out_arr[1][0] * (1 - ((j + 1) / 6.0f));
-// #else 
-//             mixed_out_l += out_arr[0][0];
-//             mixed_out_r += out_arr[1][0];
-// #endif
-//         }
-//         out[0][i] = mixed_out_l ;// / 6.0f;
-//         out[1][i] = mixed_out_r ;// / 6.0f;
-//     };
-// #if CPU_METER
-// #if !CPU_LoadEffect
-//     loadMeter.OnBlockEnd();
-// #elif CPU_LoadAll
-//     // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
-//     if (earth_effects[0] != nullptr) {
-//         earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
-//         earth_effects[0]->profiled_ticks = 0;
-//     }
-//     loadMeter.OnBlockEnd();
-// #else 
-//     // À la fin du bloc audio, on sauvegarde la somme des cycles pour l'affichage, et on remet à 0
-//     if (earth_effects[0] != nullptr) {
-//         earth_effects[0]->last_profiled_ticks = earth_effects[0]->profiled_ticks;
-//         earth_effects[0]->profiled_ticks = 0;
-//     }
-// #endif
-// #endif
-
-//     #pragma endregion
-// }
-*/
 
 int main(void)
 {
@@ -141,7 +38,6 @@ int main(void)
 
     hardware.Init(true);
 
-    hardware.seed.StartLog(false);
 #else
     // Configure et initialise la Daisy Seed seule
     hardware.Configure();
@@ -168,15 +64,16 @@ int main(void)
     }
 #endif
 
+    auto blocksize = DaisyTdmSlave::kBlockSize;
+
 #if !USE_DAISY_TDM
     samplerate = hardware.AudioSampleRate();
     hardware.SetAudioBlockSize(48); // LIMITE LIBDAISY : la taille max est de 128. 48 est sûr et multiple de 6.
 #else 
-    samplerate = hardware.seed.AudioSampleRate();
-    hardware.seed.SetAudioBlockSize(48);
+    samplerate = DaisyTdmSlave::kSampleRate;
+    hardware.seed.SetAudioBlockSize(blocksize);
 #endif
 
-    auto blocksize = hardware.seed.AudioBlockSize();
 #if CPU_METER
     // Initialisation du module de mesure CPU
     hardware.seed.StartLog(true);
@@ -213,7 +110,7 @@ int main(void)
     // hardware.StartAdc();
 #endif
 
-    hardware.StartAudio(AudiotestCallback);
+    hardware.StartAudio(AudioCallback);
 
     led_state = true;
     last_blink = System::GetNow();
@@ -245,7 +142,7 @@ int main(void)
 #else
             // 480 000 ticks correspondent au temps CPU max disponible pour 1 bloc audio (1 ms)
             // On divise nos ticks par ça pour avoir un pourcentage de charge CPU exact de la fonction ciblée
-            float specificLoad = ((float)earth_effects[0]->last_profiled_ticks / 480000.0f) * 100.0f;
+            float specificLoad = ((float)earth_effects[0]->last_profiled_ticks / samplerate) * 100.0f;
             hardware.seed.PrintLine("Charge fonction cible : %d%%", (int)specificLoad);
 #if CPU_LoadAll
             hardware.seed.PrintLine("Charge CPU Moyenne : %d%% | Max : %d%%", 
