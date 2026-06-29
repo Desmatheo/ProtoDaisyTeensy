@@ -293,6 +293,12 @@ AudioConnection p_wav_outR(wavPlayer, 0, outputTDM, 12); // Lecteur WAV -> Sorti
 //AudioConnection p_test_osc_L(testOsc, 0, outputTDM, 14);
 //AudioConnection p_test_osc_R(testOsc, 0, outputTDM, 12);
 #endif
+
+#if OutputUSB
+// NOUVEAU ROUTAGE USB : On envoie aussi le son du lecteur WAV vers la sortie USB
+AudioConnection p_wav_out_usbL(wavPlayer, 0, usbOut, 0); // Lecteur WAV -> USB Gauche
+AudioConnection p_wav_out_usbR(wavPlayer, 0, usbOut, 1); // Lecteur WAV -> USB Droite (dual mono)
+#endif
 #pragma endregion
 
 unsigned long tempsDerniereNote = 0;
@@ -438,8 +444,6 @@ void loop() {
         }
     }
 #endif
-
-    delay(2);
 
 }
 
