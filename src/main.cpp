@@ -171,11 +171,15 @@ int main(void)
 #include "EffetDisto/AudioEffectDrive.h"
 #include "include/Utils.h"
 #include "EffetTempBypass/Bypass.h"
+#include <SD.h> // NOUVEAU: Pour la carte SD
 
 #pragma region Objet audios
 #if !InputTDM
 AudioSynthWaveform       mesOscs[6];       // combinaison d'oscillateurs
 #endif
+
+AudioPlaySdWav           wavPlayer;        // NOUVEAU: Lecteur de fichier WAV depuis la carte SD
+//AudioSynthWaveform       testOsc;          // NOUVEAU: Oscillateur pour le test
 
 DelayEffect              mesDelays[6];
 EarthEffect              EffetEarth[6];
@@ -278,13 +282,16 @@ AudioConnection p_mastR1(mixerR_1a4, 0, masterR, 0);
 AudioConnection p_mastR2(mixerR_5et6, 0, masterR, 1);
 
 // Masters -> Sorties
-#if OutputUSB
-AudioConnection p_outL_usb(masterL, 0, usbOut, 0);
-AudioConnection p_outR_usb(masterR, 0, usbOut, 1);
-#endif
 #if OutputTDM
-AudioConnection p_outL_tdm(masterL, 0, outputTDM, 14); // Sortie Analogique Gauche
-AudioConnection p_outR_tdm(masterR, 0, outputTDM, 12); // Sortie Analogique Droite
+// ANCIEN ROUTAGE : Le son des effets allait vers les sorties.
+// AudioConnection p_outL_tdm(masterL, 0, outputTDM, 14); // Sortie Analogique Gauche
+// AudioConnection p_outR_tdm(masterR, 0, outputTDM, 12); // Sortie Analogique Droite
+// NOUVEAU ROUTAGE : Le son du lecteur WAV va directement aux sorties du codec.
+AudioConnection p_wav_outL(wavPlayer, 0, outputTDM, 14); // Lecteur WAV -> Sortie Analogique Gauche
+AudioConnection p_wav_outR(wavPlayer, 0, outputTDM, 12); // Lecteur WAV -> Sortie Analogique Droite (dual mono)
+// ROUTAGE DE TEST : Un oscillateur simple vers les sorties
+//AudioConnection p_test_osc_L(testOsc, 0, outputTDM, 14);
+//AudioConnection p_test_osc_R(testOsc, 0, outputTDM, 12);
 #endif
 #pragma endregion
 
@@ -301,13 +308,35 @@ bool globalBypassState = false;
 
 void OnControlChange(byte channel, byte control, byte value);
 
-const int reset_p = 2; 
+const int reset_p = 34; 
 
 void setup() {
     pinMode(13, OUTPUT); // NOUVEAU : LED de statut MIDI
     Serial.begin(115200);
 
+    // --- NOUVEAU : Attendre que le port série soit ouvert ---
+    // La Teensy est si rapide que les messages de setup() peuvent être manqués.
+    // On attend INDÉFINIMENT que le moniteur série soit ouvert.
+    while (!Serial) {
+        // On attend...
+    }
+
+    // --- NOUVEAU : Initialisation de la carte SD ---
+    Serial.println("Initialisation de la carte SD...");
+    // La broche CS par défaut pour la carte SD sur Teensy 4.1 est BUILTIN_SDCARD.
+    // Si vous utilisez un shield avec une autre broche, changez la valeur ici.
+    if (!SD.begin(BUILTIN_SDCARD)) {
+        Serial.println("Echec de l'initialisation de la carte SD !");
+        while (1) { // Bloque le programme en cas d'erreur
+            digitalWrite(13, !digitalRead(13)); delay(100);
+        }
+    }
+    Serial.println("Carte SD initialisée.");
+    // ---------------------------------------------
+
     AudioMemory(1500); // on alloue une mémoire suffisante 
+
+    //testOsc.begin(0.5, 440.0, WAVEFORM_SINE); // Volume 50%, 440Hz, Sinus
 
     #if InputTDM || OutputTDM
     
@@ -356,6 +385,13 @@ void setup() {
         // --------------------------------------------------------- 
     }
     #pragma endregion
+
+    // --- NOUVEAU : Lancer la lecture d'un fichier WAV ---
+    // Assurez-vous que le fichier "S12.wav" (nom en majuscules, 8.3) 
+    // est bien à la racine de la carte SD.
+    Serial.println("Lecture de S12.WAV...");
+    wavPlayer.play("S12.WAV");
+    // ----------------------------------------------------
 
     usbMIDI.setHandleControlChange(OnControlChange); //Active la fonction OnControlChange() des qu'il y a un CC 
 }

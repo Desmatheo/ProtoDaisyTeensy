@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef USE_DAISY
-#define USE_DAISY 1
+#define USE_DAISY 0
 #endif
 
 #define MODE_HEXAPHONIQUE
@@ -10,7 +10,7 @@
 #if InputTDM
 #define OutputTDM 1   // 1: Sortie Jack CS42448 (TDM), 0: Désactivé
 #endif
-#define OutputUSB 1   // 1: Sortie Casque/PC (USB), 0: Désactivé
+#define OutputUSB 0   // 1: Sortie Casque/PC (USB), 0: Désactivé
 
 #define USE_DAISY_POD 0
 
