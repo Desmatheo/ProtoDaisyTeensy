@@ -80,6 +80,8 @@ int main(void)
     loadMeter.Init(samplerate, blocksize);
 #endif
 
+    hardware.seed.StartLog(true);
+
     // La SDRAM n'est pas mise à zéro par défaut. On la vide pour éviter des bruits stridents dans la reverb.
     memset(earth_mem, 0, 6 * sizeof(EarthEffect));
     memset(delay_mem, 0, 6 * sizeof(DelayEffect));
@@ -106,8 +108,6 @@ int main(void)
 
 #if USE_DAISY_POD
     hardware.StartAdc();
-#else 
-    // hardware.StartAdc();
 #endif
 
     hardware.StartAudio(AudioCallback);
@@ -121,9 +121,31 @@ int main(void)
     while(1)
     {
         // Met à jour les boutons et LEDs toutes les 1 ms sans bloquer le CPU
-        if (System::GetNow() - last_ui_update >= 1) {
+        if (System::GetNow() - last_ui_update >= 1000) {
             last_ui_update = System::GetNow();
             updateUI();
+
+
+            const uint32_t cb_per_s = audio_diag.callback_count;
+            audio_diag.callback_count = 0;
+
+            hardware.seed.PrintLine("callbacks/s: %lu (attendu ~%d)",
+                              cb_per_s,
+                              (int)(DaisyTdmSlave::kSampleRate
+                                    / DaisyTdmSlave::kBlockSize));
+            float peaks[DaisyTdmSlave::kNumInputs];
+            for(size_t ch = 0; ch < DaisyTdmSlave::kNumInputs; ch++)
+                peaks[ch] = audio_diag.in_peak[ch];
+            audio_diag.ResetPeaks();
+
+            hardware.seed.PrintLine(
+                "Peaks IN - C1/2: " FLT_FMT3 " / " FLT_FMT3 " | C3/4: " FLT_FMT3 " / " FLT_FMT3 " | C5/6: " FLT_FMT3 " / " FLT_FMT3 " | C7/8: " FLT_FMT3 " / " FLT_FMT3 ,
+                FLT_VAR3(peaks[0]), FLT_VAR3(peaks[1]),
+                FLT_VAR3(peaks[2]), FLT_VAR3(peaks[3]),
+                FLT_VAR3(peaks[4]), FLT_VAR3(peaks[5]), 
+                FLT_VAR3(peaks[6]), FLT_VAR3(peaks[7])
+            );
+
         }
         
 #if CPU_METER
@@ -139,6 +161,7 @@ int main(void)
             hardware.seed.PrintLine("Charge CPU Moyenne : %d%% | Max : %d%%", 
                         (int)(avgLoad * 100.0f), 
                         (int)(maxLoad * 100.0f));
+            hardware.seed.PrintLine("nombre de callback : %d", (int) audio_diag.callback_count );
 #else
             // 480 000 ticks correspondent au temps CPU max disponible pour 1 bloc audio (1 ms)
             // On divise nos ticks par ça pour avoir un pourcentage de charge CPU exact de la fonction ciblée
@@ -301,7 +324,7 @@ bool globalBypassState = false;
 
 void OnControlChange(byte channel, byte control, byte value);
 
-const int reset_p = 2; 
+const int reset_p = 34; 
 
 void setup() {
     pinMode(13, OUTPUT); // NOUVEAU : LED de statut MIDI
@@ -329,6 +352,13 @@ void setup() {
     cs42448_1.volume(1.0);
 
     #endif
+
+    // Tout mettre en bypass, sans activer le global Bypass pour ne pas tout bloquer.
+    for (int i = 0; i < 6; i++){
+        OnControlChange(0, i, 127);
+        stringBypass[i] = false;
+    }
+    globalBypassState = false;
 
     #pragma region Initialisation des effets et oscillateurs
     for (int i = 0; i < 6; i++) {
@@ -368,6 +398,9 @@ void loop() {
     // NOUVEAU : Passé de 5ms à 500ms. 5ms saturait le port USB Série et bloquait complètement la Teensy !
     if (tempsActuel - lastHeartbeat >= 500) { 
         lastHeartbeat = tempsActuel;
+        
+        
+        // Affichage Charge CPU
         Serial.print("Charge CPU Audio Actuelle : ");
         Serial.print(AudioProcessorUsage());
         Serial.println(" %");
@@ -375,6 +408,20 @@ void loop() {
         Serial.print("Charge CPU Audio Max : ");
         Serial.print(AudioProcessorUsageMax());
         Serial.println(" %");
+        
+
+        // Affichage Effets Cordes
+        for (int i = 0; i < 6; i++) {
+            Serial.print("Corde ");
+            Serial.print(i + 1);
+            Serial.print(" : ");
+            if (effetActif[i] == 0) Serial.print("Aucun");
+            else if (effetActif[i] == 1) Serial.print("Delay");
+            else if (effetActif[i] == 2) Serial.print("Disto");
+            else if (effetActif[i] == 3) Serial.print("Earth");
+            Serial.print(" | Bypass : ");
+            Serial.println(stringBypass[i] ? "Oui" : "Non");
+        }
         
         digitalWrite(13, !digitalRead(13)); // Clignotement lent
     }
@@ -475,7 +522,7 @@ void OnControlChange(byte channel, byte control, byte value) {
                 EffetEarth[corde].setEnabled(true);
             }
             // Affichage mouchard dans la console VS Code
-            Serial.print("MIDI -> Effet: DELAY | Corde: ");
+            Serial.print("MIDI -> Effet: Octaver | Corde: ");
             Serial.print(corde);
             Serial.print(" | Potard: P");
             Serial.print(potard + 1);
@@ -499,7 +546,7 @@ void OnControlChange(byte channel, byte control, byte value) {
         int potard = ccRelatif % 6;
         
         // Affichage mouchard dans la console VS Code
-        Serial.print("MIDI -> Effet: DELAY | Corde: ");
+        Serial.print("MIDI -> Effet: Bypass | Corde: ");
         Serial.print(corde);
         Serial.print(" | Potard: P");
         Serial.print(potard + 1);
@@ -519,9 +566,9 @@ void OnControlChange(byte channel, byte control, byte value) {
             EffetEarth[control].setEnabled(false);
         } else {
             // Si on sort du bypass, on réactive le dernier effet utilisé
-            if (effetActif[control] == 1) mesDelays[control].setEnabled(true);
-            else if (effetActif[control] == 2) mesDistos[control].setEnabled(true);
-            else if (effetActif[control] == 3) EffetEarth[control].setEnabled(true);
+            if (effetActif[control] == 1)       mesDelays[control].setEnabled(true);
+            else if (effetActif[control] == 2)  mesDistos[control].setEnabled(true);
+            else if (effetActif[control] == 3)  EffetEarth[control].setEnabled(true);
         }
     }
     
@@ -536,9 +583,9 @@ void OnControlChange(byte channel, byte control, byte value) {
                 mesDelays[i].setEnabled(false);
                 EffetEarth[i].setEnabled(false);
             } else {
-                if (effetActif[i] == 1) mesDelays[i].setEnabled(true);
-                else if (effetActif[i] == 2) mesDistos[i].setEnabled(true);
-                else if (effetActif[i] == 3) EffetEarth[i].setEnabled(true);
+                if (effetActif[i] == 1)         mesDelays[i].setEnabled(true);
+                else if (effetActif[i] == 2)    mesDistos[i].setEnabled(true);
+                else if (effetActif[i] == 3)    EffetEarth[i].setEnabled(true);
             }
 
         }

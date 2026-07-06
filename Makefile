@@ -33,8 +33,7 @@ CPP_STANDARD = -std=gnu++20
 # On demande au compilateur de placer le programme dans les 8 Mo de la QSPI Flash
 APP_TYPE = BOOT_QSPI
 
-OPT = -O3 -ffast-math
-
+OPT = -O3 -ffast-math 
 
 # Emplacement du Makefile central de libDaisy qui gère toute la magie de compilation
 SYSTEM_FILES_DIR = $(LIBDAISY_DIR)/core

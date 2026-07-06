@@ -19,6 +19,8 @@
 
 #if USE_DAISY
 
+int tempCB = 0;
+
 #if USE_DAISY_POD
 DaisyPod hardware;
 
@@ -64,11 +66,11 @@ public :
 
 StringUtil strings[] = {
     StringUtil(EffectType::Earth, 0),
-    StringUtil(EffectType::Bypass, 1),
-    StringUtil(EffectType::Bypass, 2),
-    StringUtil(EffectType::Bypass, 3),
-    StringUtil(EffectType::Bypass, 4),
-    StringUtil(EffectType::Bypass, 5)
+    StringUtil(EffectType::Earth, 1),
+    StringUtil(EffectType::Earth, 2),
+    StringUtil(EffectType::Earth, 3),
+    StringUtil(EffectType::Earth, 4),
+    StringUtil(EffectType::Earth, 5)
 };
 
 #if CPU_METER

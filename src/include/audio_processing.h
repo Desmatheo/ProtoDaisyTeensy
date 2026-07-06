@@ -21,6 +21,7 @@ extern DaisySeed hardware;
 // ================================================================
 struct AudioDiagnostics
 {
+
     volatile uint32_t callback_count = 0;
     volatile float    in_peak[DaisyTdmSlave::kNumInputs] = {0};
 
@@ -56,16 +57,12 @@ static void AudioCallback(daisy::AudioHandle::InputBuffer  in,
                           size_t                           size)
 {
 
+    audio_diag.callback_count++;
 
-    hardware.seed.PrintLine("test entrée AudioBlock");
+    bool signal_present = false;
 
-
-    #if CPU_METER
-    #if !CPU_LoadEffect
+    #if CPU_METER && (!CPU_LoadEffect || CPU_LoadAll)
         loadMeter.OnBlockStart();
-    #elif CPU_LoadAll
-        loadMeter.OnBlockStart();
-    #endif
     #endif
 
 
@@ -74,21 +71,33 @@ static void AudioCallback(daisy::AudioHandle::InputBuffer  in,
     const float** in2 = const_cast<const float**>(in);
     float** out2 = const_cast<float**>(out);
     //parcourt les echantillons du buffer
-    for (int i = 0; i < (int)size; i++){
+    for (size_t echant = 0; echant < size; echant++){
+
+        for(size_t ch = 0; ch < DaisyTdmSlave::kNumInputs; ch++)
+        {
+            const float s   = in[ch][echant];
+            const float mag = fabsf(s);
+            if(mag > audio_diag.in_peak[ch])
+                audio_diag.in_peak[ch] = mag;
+            if(mag > 0.05f)
+                signal_present = true;
+        }
+
 
 
         // Audio de sortie (6 entrées)
-        for (int j = 0; j < 6; j++){
+        for (size_t ch = 0; ch <  DaisyTdmSlave::kNumInputs; ch++){
+
             // Si la corde est mute on met a 0 sans chercher le sample d'entrée
-            if (strings[j].type == EffectType::Mute) {
-                out[j][i] = 0;
+            if (strings[ch].type == EffectType::Mute) {
+                out[ch][echant] = 0;
             }
             else {
 
-                if (strings[j].type == EffectType::Bypass) {
-                    out[j][i] = in[j][i];
-                } else if (strings[j].active_effect != nullptr) {
-                    strings[j].active_effect->update(in2, out2, i, j);
+                if (strings[ch].type == EffectType::Bypass) {
+                    out[ch][echant] = in[ch][echant];
+                } else if (strings[ch].active_effect != nullptr) {
+                    strings[ch].active_effect->update(in2, out2, echant, ch);
                 }
             }
         }
@@ -114,7 +123,6 @@ static void AudioCallback(daisy::AudioHandle::InputBuffer  in,
     #endif
     #endif
     /*
-    audio_diag.callback_count++;
 
     bool signal_present = false;
 

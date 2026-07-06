@@ -145,9 +145,9 @@ void EarthEffect::update() {
                 float octave_mix = 0.0f;
                 octave.update(sample, effect_mode);
 
-                if (effect_mode == 1) octave_mix += octave.up1() * 1.0f;
-                if (effect_mode == 2) octave_mix += octave.down1() * 2.0f;
-                if (effect_mode == 3) octave_mix += octave.down2() * 4.0f;
+                if (effect_mode == 1) octave_mix += octave.up1()    * 6.0f;
+                if (effect_mode == 2) octave_mix += octave.down1()  * 6.0f;
+                if (effect_mode == 3) octave_mix += octave.down2()  * 6.0f;
 
                 auto out_chunk = interpolate(octave_mix);
                 for (size_t j = 0; j < out_chunk.size(); ++j) {
